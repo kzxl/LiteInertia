@@ -86,6 +86,17 @@ class Inertia
     }
 
     /**
+     * Helper to store a flash message in the active session.
+     */
+    public static function flash(string $key, mixed $message, string $sessionKey = 'flash'): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE && !headers_sent()) {
+            @session_start();
+        }
+        $_SESSION[$sessionKey][$key] = $message;
+    }
+
+    /**
      * Render an Inertia response matching the Inertia.js protocol.
      *
      * @param array<string, mixed> $props Component props

@@ -1,7 +1,7 @@
 # LiteInertia
 
 [![PHP 8.2+](https://img.shields.io/badge/php-8.2%2B-blue.svg)](https://www.php.net/)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)]()
 
 Zero-dependency [Inertia.js](https://inertiajs.com/) protocol adapter for Slim 4 and PSR-7/PSR-15 applications. Seamlessly bridge your backend into React, Vue, or Svelte without building complex REST/GraphQL APIs or configuring client-side routing.
@@ -121,4 +121,5 @@ Runs test suite using PHPUnit 11 with 100% pass rate.
 
 ## License
 
-Apache-2.0.
+MIT License — see [LICENSE](LICENSE) for details.
+

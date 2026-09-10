@@ -1,8 +1,31 @@
 {
     "name": "kzxl/lite-inertia",
-    "description": "Zero-dependency Inertia.js protocol adapter for Slim 4 and PSR-7/PSR-15 applications",
+    "description": "Zero-dependency Inertia.js protocol adapter for Slim 4 and PSR-7/PSR-15 applications.",
     "type": "library",
-    "license": "Apache-2.0",
+    "license": "MIT",
+    "homepage": "https://github.com/kzxl/LiteInertia",
+    "support": {
+        "issues": "https://github.com/kzxl/LiteInertia/issues",
+        "source": "https://github.com/kzxl/LiteInertia"
+    },
+    "authors": [
+        {
+            "name": "Phong Vo",
+            "email": "phong.vo@kzxl.com"
+        }
+    ],
+    "keywords": [
+        "inertia",
+        "inertiajs",
+        "react",
+        "vue",
+        "svelte",
+        "slim4",
+        "psr7",
+        "psr15",
+        "spa"
+    ],
+    "minimum-stability": "stable",
     "require": {
         "php": ">=8.2",
         "psr/http-message": "^1.0 || ^2.0",

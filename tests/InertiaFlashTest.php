@@ -38,7 +38,7 @@ final class InertiaFlashTest extends TestCase
         $middleware->share(function (ServerRequestInterface $request) {
             return [
                 'auth' => ['user_id' => 123, 'name' => 'John Doe'],
-                'locale' => 'vi',
+                'locale' => 'en',
             ];
         });
 
@@ -53,7 +53,7 @@ final class InertiaFlashTest extends TestCase
         $middleware->process($request, $handler);
 
         $this->assertEquals(['user_id' => 123, 'name' => 'John Doe'], $inertia->getShared('auth'));
-        $this->assertEquals('vi', $inertia->getShared('locale'));
+        $this->assertEquals('en', $inertia->getShared('locale'));
     }
 
     public function testAutoSharesAndClearsSessionFlashMessages(): void
@@ -62,7 +62,7 @@ final class InertiaFlashTest extends TestCase
         $middleware = new InertiaMiddleware($inertia);
 
         // Flash message using helper
-        Inertia::flash('success', 'Dữ liệu đã được lưu thành công!');
+        Inertia::flash('success', 'Data saved successfully!');
         Inertia::flash('code', 200);
 
         $this->assertArrayHasKey('flash', $_SESSION);
@@ -80,7 +80,7 @@ final class InertiaFlashTest extends TestCase
         // Flash data should be shared into Inertia
         $flash = $inertia->getShared('flash');
         $this->assertIsArray($flash);
-        $this->assertEquals('Dữ liệu đã được lưu thành công!', $flash['success']);
+        $this->assertEquals('Data saved successfully!', $flash['success']);
         $this->assertEquals(200, $flash['code']);
 
         // And session flash data must be cleared (flash once)

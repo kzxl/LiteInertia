@@ -86,6 +86,74 @@ class Inertia
     }
 
     /**
+     * Create an Inertia v2 deferred property evaluated asynchronously by client after initial page load.
+     */
+    public static function defer(callable $callback, string $group = 'default'): DeferredProp
+    {
+        return new DeferredProp($callback, $group);
+    }
+
+    /**
+     * Create an Inertia v2 merge property that appends to client state instead of replacing it.
+     */
+    public static function merge(mixed $value): MergeProp
+    {
+        return new MergeProp($value);
+    }
+
+    /**
+     * Create an Inertia property that is always evaluated and sent even during partial reloads.
+     */
+    public static function always(callable $callback): AlwaysProp
+    {
+        return new AlwaysProp($callback);
+    }
+
+    /**
+     * Alias for lazy property.
+     */
+    public static function optional(callable $callback): LazyProp
+    {
+        return new LazyProp($callback);
+    }
+
+    /**
+     * Check if the current request is a client-side prefetch request.
+     */
+    public function isPrefetching(ServerRequestInterface $request): bool
+    {
+        return strtolower($request->getHeaderLine('X-Inertia-Prefetch')) === 'true';
+    }
+
+    /**
+     * Check if the current request is a partial reload.
+     */
+    public function isPartial(ServerRequestInterface $request, ?string $component = null): bool
+    {
+        $partialComponent = $request->getHeaderLine('X-Inertia-Partial-Component');
+        if ($partialComponent === '') {
+            return false;
+        }
+        return $component === null || $partialComponent === $component;
+    }
+
+    /**
+     * Instruct the Inertia client to encrypt history state for this visit.
+     */
+    public function encryptHistory(ResponseInterface $response, bool $encrypt = true): ResponseInterface
+    {
+        return $response->withHeader('X-Inertia-Encrypt-History', $encrypt ? 'true' : 'false');
+    }
+
+    /**
+     * Instruct the Inertia client to clear history state on navigation.
+     */
+    public function clearHistory(ResponseInterface $response, bool $clear = true): ResponseInterface
+    {
+        return $response->withHeader('X-Inertia-Clear-History', $clear ? 'true' : 'false');
+    }
+
+    /**
      * Helper to store a flash message in the active session.
      */
     public static function flash(string $key, mixed $message, string $sessionKey = 'flash'): void
@@ -113,17 +181,25 @@ class Inertia
 
         $allProps = array_merge($this->sharedProps, $props);
 
-        // Handle partial reloads
+        // Handle partial reloads (X-Inertia-Partial-Data and X-Inertia-Partial-Except)
         $only = [];
+        $except = [];
         $partialComponent = $request->getHeaderLine('X-Inertia-Partial-Component');
-        if ($isInertia && $partialComponent === $component) {
+        $isPartial = ($isInertia && $partialComponent !== '' && $partialComponent === $component);
+
+        if ($isPartial) {
             $partialData = $request->getHeaderLine('X-Inertia-Partial-Data');
             if ($partialData !== '') {
                 $only = array_filter(array_map('trim', explode(',', $partialData)));
             }
+
+            $partialExcept = $request->getHeaderLine('X-Inertia-Partial-Except');
+            if ($partialExcept !== '') {
+                $except = array_filter(array_map('trim', explode(',', $partialExcept)));
+            }
         }
 
-        $resolvedProps = $this->resolveProps($allProps, $only);
+        [$resolvedProps, $deferredProps, $mergeProps] = $this->resolveProps($allProps, $isPartial, $only, $except);
 
         $page = [
             'component' => $component,
@@ -131,6 +207,14 @@ class Inertia
             'url' => $currentUrl,
             'version' => $version,
         ];
+
+        if (!empty($deferredProps)) {
+            $page['deferredProps'] = $deferredProps;
+        }
+
+        if (!empty($mergeProps)) {
+            $page['mergeProps'] = array_values(array_unique($mergeProps));
+        }
 
         // 1. Inertia JSON response
         if ($isInertia) {
@@ -164,22 +248,63 @@ class Inertia
      * Resolve property values, executing callbacks and respecting partial reloads.
      *
      * @param array<string, mixed> $props
+     * @param bool $isPartial
      * @param list<string> $only
-     * @return array<string, mixed>
+     * @param list<string> $except
+     * @return array{0: array<string, mixed>, 1: array<string, list<string>>, 2: list<string>}
      */
-    private function resolveProps(array $props, array $only): array
+    private function resolveProps(array $props, bool $isPartial, array $only, array $except): array
     {
-        $isPartial = !empty($only);
-        $onlyMap = array_fill_keys($only, true);
+        $onlyMap = !empty($only) ? array_fill_keys($only, true) : null;
+        $exceptMap = !empty($except) ? array_fill_keys($except, true) : null;
+
         $resolved = [];
+        $deferredProps = [];
+        $mergeProps = [];
 
         foreach ($props as $key => $value) {
-            if ($isPartial && !isset($onlyMap[$key])) {
+            // Check if this prop is a MergeProp
+            if ($value instanceof MergeProp) {
+                $mergeProps[] = $key;
+                $value = $value->getValue();
+            }
+
+            // AlwaysProp is included even during partial reloads
+            if ($value instanceof AlwaysProp) {
+                $resolved[$key] = $value();
                 continue;
             }
 
+            // Handle DeferredProp (Inertia v2)
+            if ($value instanceof DeferredProp) {
+                if (!$isPartial) {
+                    // On initial / full visit: do NOT evaluate, list in deferredProps for client async fetch
+                    $group = $value->getGroup();
+                    $deferredProps[$group][] = $key;
+                    continue;
+                }
+
+                // If partial reload, only include if explicitly requested in $only
+                if ($onlyMap !== null && !isset($onlyMap[$key])) {
+                    continue;
+                }
+
+                $resolved[$key] = $value();
+                continue;
+            }
+
+            // If partial reload, check only / except
+            if ($isPartial) {
+                if ($onlyMap !== null && !isset($onlyMap[$key])) {
+                    continue;
+                }
+                if ($exceptMap !== null && isset($exceptMap[$key])) {
+                    continue;
+                }
+            }
+
+            // LazyProp is ONLY evaluated when explicitly requested in partial reload
             if ($value instanceof LazyProp) {
-                // Lazy props are only evaluated when explicitly requested in partial reload
                 if (!$isPartial) {
                     continue;
                 }
@@ -191,7 +316,7 @@ class Inertia
             $resolved[$key] = $value;
         }
 
-        return $resolved;
+        return [$resolved, $deferredProps, $mergeProps];
     }
 
     /**

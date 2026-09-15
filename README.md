@@ -13,11 +13,17 @@ Zero-dependency [Inertia.js](https://inertiajs.com/) protocol adapter for Slim 4
 - **Full Inertia.js Protocol Compliance**:
   - Initial browser visit: Renders root HTML view containing `<div id="app" data-page="..."></div>` with escaped JSON.
   - Subsequent client visits (`X-Inertia: true`): Returns JSON payload containing `{ component, props, url, version }`.
+- **Inertia v2 Protocol Support**:
+  - **Deferred Props (`Inertia::defer(...)`)**: Non-blocking page load; heavy props are fetched asynchronously by client in the background with `deferredProps` metadata and grouping.
+  - **Merge Props (`Inertia::merge(...)`)**: Infinite scrolling / append mode (`mergeProps`) instead of replacing client state.
+  - **Always Props (`Inertia::always(...)`)**: Critical data that is always evaluated and returned even during partial reloads.
+  - **Partial Except (`X-Inertia-Partial-Except`)**: Exclude specific heavy keys while keeping all other props.
+  - **Prefetch Detection & History Controls**: `$inertia->isPrefetching($request)`, `encryptHistory()`, and `clearHistory()`.
 - **Shared Props**:
   - Global props (`Inertia::share()`) merged across all page responses (auth user, flash alerts, menu items).
 - **Partial Reloads & Lazy Props**:
   - Supports `X-Inertia-Partial-Component` and `X-Inertia-Partial-Data`.
-  - Lazy props (`Inertia::lazy(fn() => ...)`) are evaluated **only** when explicitly requested, preventing expensive queries on initial navigation.
+  - Lazy props (`Inertia::lazy(fn() => ...)`) are evaluated **only** when explicitly requested.
 - **Asset Versioning**:
   - Automatic `409 Conflict` response with `X-Inertia-Location` header via `InertiaMiddleware` whenever frontend assets change, instructing client to perform a full hard refresh.
 - **Micro-Footprint**: Zero external dependencies beyond standard PSR-7 and PSR-15 interfaces.
@@ -78,7 +84,11 @@ $app->add(new InertiaMiddleware($inertia));
 $app->get('/users', function (Request $request, Response $response) use ($inertia, $em) {
     return $inertia->render($response, $request, 'Users/Index', [
         'users' => $em->findAll(User::class),
-        // Lazy prop: computed only when requested via partial reload!
+        // Inertia v2 Deferred Prop: loaded asynchronously in background by client
+        'analytics' => Inertia::defer(fn() => $em->computeExpensiveMetrics(), group: 'analytics'),
+        // Inertia v2 Merge Prop: for infinite scroll pagination
+        'activityFeed' => Inertia::merge($em->getRecentActivities()),
+        // Lazy prop: computed only when requested via partial reload
         'heavyStats' => $inertia->lazy(fn() => $em->computeStats()),
     ]);
 });

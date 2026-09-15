@@ -17,6 +17,9 @@
     "keywords": [
         "inertia",
         "inertiajs",
+        "inertia-v2",
+        "deferred-props",
+        "merge-props",
         "react",
         "vue",
         "svelte",
